@@ -19,7 +19,7 @@ spec:
         - name: auth-service
           # A tag abaixo é atualizada automaticamente pelo pipeline de CI
           # (workflow "update-gitops" do repositório reusable-workflows).
-          image: 093716960197.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+          image: 093716960197.dkr.ecr.us-east-1.amazonaws.com/auth-service:v1.0.0-f445c8c
           ports:
             - containerPort: 8001
           env:
