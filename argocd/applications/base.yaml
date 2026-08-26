@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: toogle-master-base
+  namespace: argocd
+spec:
+  project: toogle-master
+  source:
+    repoURL: 'https://github.com/3DCLT-Fiap-Devops/toogle-master-gitops.git'
+    targetRevision: main
+    path: apps/base
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: toogle-master
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,22 @@
+# App-of-Apps: uma única Application "raiz" que o time aplica manualmente
+# (uma vez) no cluster. A partir daí, o ArgoCD passa a gerenciar a si mesmo:
+# tudo em argocd/applications/*.yaml (base + 5 microsserviços) é criado e
+# sincronizado automaticamente, sem mais nenhum kubectl apply manual.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: toogle-master-root
+  namespace: argocd
+spec:
+  project: toogle-master
+  source:
+    repoURL: 'https://github.com/3DCLT-Fiap-Devops/toogle-master-gitops.git'
+    targetRevision: main
+    path: argocd/applications
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

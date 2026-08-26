@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: targeting-service
+  namespace: argocd
+spec:
+  project: toogle-master
+  source:
+    repoURL: 'https://github.com/3DCLT-Fiap-Devops/toogle-master-gitops.git'
+    targetRevision: main
+    path: apps/targeting-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: toogle-master
+  syncPolicy:
+    # Pull-based: o ArgoCD é quem consulta o repo Git (polling ~3min, ou via
+    # webhook) e sincroniza; nada externo faz "push" no cluster.
+    automated:
+      prune: true      # remove recursos que saíram do Git
+      selfHeal: true    # desfaz mudanças manuais feitas via kubectl direto
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

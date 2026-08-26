@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: toogle-master
+  namespace: argocd
+spec:
+  description: Projeto ArgoCD para os 5 microsserviços do ToggleMaster
+  sourceRepos:
+    - 'https://github.com/3DCLT-Fiap-Devops/toogle-master-gitops.git'
+  destinations:
+    - namespace: toogle-master
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
