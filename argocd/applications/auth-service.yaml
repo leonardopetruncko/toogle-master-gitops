@@ -6,7 +6,7 @@ metadata:
 spec:
   project: toogle-master
   source:
-    repoURL: 'https://github.com/3DCLT-Fiap-Devops/toogle-master-gitops.git'
+    repoURL: 'https://github.com/drop0rz/toogle-master-gitops.git'
     targetRevision: main
     path: apps/auth-service
   destination:
