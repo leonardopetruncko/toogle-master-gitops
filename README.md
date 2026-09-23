@@ -119,6 +119,9 @@ Decisões importantes:
 
 Runbook do incidente: [docs/runbook-auth-5xx.md](docs/runbook-auth-5xx.md).
 
+Roteiro da gravação, memória de construção e dificuldades enfrentadas:
+[docs/roteiro-video-fase4.md](docs/roteiro-video-fase4.md).
+
 Tudo o que precisou ser corrigido para a Fase 4 funcionar (CI quebrado, SSRF apontado pelo
 gosec, Security Group dos nós do EKS, bancos não inicializados e as correções encontradas
 na validação em cluster real): [docs/melhorias-fase4.md](docs/melhorias-fase4.md).
