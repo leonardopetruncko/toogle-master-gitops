@@ -1,0 +1,123 @@
+# Self-healer (Runbook Automation): recebe o webhook do Grafana e reinicia o deployment afetado.
+# O código (self_healer.py) vira ConfigMap pelo kustomization.yaml; roda na imagem oficial do Python.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: self-healer
+  namespace: observability
+---
+# Menor privilégio: só ler e "patchear" deployments, e só no namespace das aplicações.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: self-healer-rollout-restart
+  namespace: toogle-master
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: self-healer-rollout-restart
+  namespace: toogle-master
+subjects:
+  - kind: ServiceAccount
+    name: self-healer
+    namespace: observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: self-healer-rollout-restart
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-healer
+  namespace: observability
+  labels:
+    app: self-healer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: self-healer
+  template:
+    metadata:
+      labels:
+        app: self-healer
+    spec:
+      serviceAccountName: self-healer
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: self-healer
+          image: python:3.12-slim
+          command: ["python", "/app/self_healer.py"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            # Allowlist: só estes deployments podem ser reiniciados automaticamente.
+            - name: ALLOWED_NAMESPACES
+              value: toogle-master
+            - name: ALLOWED_DEPLOYMENTS
+              value: auth-service,flag-service,targeting-service,evaluation-service,analytics-service
+            # No máximo 1 restart automático por deployment a cada 5 minutos.
+            - name: COOLDOWN_SECONDS
+              value: "300"
+            - name: DISCORD_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-alerting
+                  key: DISCORD_WEBHOOK_URL
+                  optional: true
+          volumeMounts:
+            - name: code
+              mountPath: /app
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 96Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 20
+      volumes:
+        - name: code
+          configMap:
+            name: self-healer-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: self-healer
+  namespace: observability
+spec:
+  selector:
+    app: self-healer
+  ports:
+    - port: 8080
+      targetPort: 8080

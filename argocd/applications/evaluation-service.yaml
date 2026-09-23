@@ -12,6 +12,18 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: toogle-master
+  # O self-healer faz "rollout restart" (annotation restartedAt no template do pod).
+  # Sem isto, o selfHeal do ArgoCD desfaria o restart e causaria um segundo rollout.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - .spec.template.metadata.annotations."kubectl.kubernetes.io/restartedAt"
+    # O HPA controla o número de réplicas; o Git não deve brigar com ele.
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
   syncPolicy:
     # Pull-based: o ArgoCD é quem consulta o repo Git (polling ~3min, ou via
     # webhook) e sincroniza; nada externo faz "push" no cluster.
@@ -20,6 +32,7 @@ spec:
       selfHeal: true    # desfaz mudanças manuais feitas via kubectl direto
     syncOptions:
       - CreateNamespace=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:

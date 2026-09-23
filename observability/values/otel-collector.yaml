@@ -1,0 +1,105 @@
+# OpenTelemetry Collector: a peça central da Fase 4.
+# Recebe traces e métricas dos 5 microsserviços (OTLP) e os logs de todos os pods
+# (filelog), enriquece com metadados do Kubernetes e roteia cada sinal:
+#   traces   -> Datadog (APM) + connectors (datadog e spanmetrics)
+#   métricas -> Prometheus (remote write) + Datadog
+#   logs     -> Loki + Datadog
+mode: daemonset
+fullnameOverride: otel-collector
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+
+presets:
+  # Lê /var/log/pods de cada nó (logs de todos os contêineres do cluster).
+  logsCollection:
+    enabled: true
+    includeCollectorLogs: false
+  # Adiciona k8s.namespace.name, k8s.pod.name, k8s.deployment.name etc. a todos os sinais.
+  kubernetesAttributes:
+    enabled: true
+
+# Cada app fala com o Collector do próprio nó; assim o k8sattributes acha o pod de origem.
+service:
+  enabled: true
+  internalTrafficPolicy: Local
+
+# A API key vem de um Secret criado pelo script fase4-secrets.ps1 (nunca vai para o Git).
+extraEnvs:
+  - name: DD_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: datadog-api
+        key: api-key
+        optional: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+  limits:
+    memory: 512Mi
+
+config:
+  processors:
+    batch:
+      send_batch_size: 1000
+      send_batch_max_size: 1000
+      timeout: 5s
+    resource/cluster:
+      attributes:
+        - key: k8s.cluster.name
+          value: toogle-cluster
+          action: upsert
+        - key: deployment.environment
+          value: fase4
+          action: upsert
+
+  connectors:
+    # Gera métricas RED (requests, erros, duração) a partir dos spans, igual para Go e Python.
+    # É dessas métricas que saem o painel de req/s e o alerta de 5xx do auth-service.
+    spanmetrics:
+      metrics_flush_interval: 15s
+      histogram:
+        explicit:
+          buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2500ms, 5s]
+    # Calcula as APM stats do Datadog (é o que alimenta o Service Map e as métricas de trace).
+    datadog/connector:
+      traces:
+        compute_stats_by_span_kind: true
+        peer_tags_aggregation: true
+
+  exporters:
+    datadog:
+      api:
+        key: ${env:DD_API_KEY}
+        # Conta em outra região? Troque por datadoghq.eu, us3.datadoghq.com ou us5.datadoghq.com
+        # (o script testar-integracoes.ps1 descobre e avisa qual é a sua).
+        site: datadoghq.com
+        # Sem a chave (ou com chave errada) o Collector continua de pé e só loga o erro.
+        fail_on_invalid_key: false
+      hostname: ${env:K8S_NODE_NAME}
+      host_metadata:
+        enabled: true
+        hostname_source: config_or_system
+    prometheusremotewrite:
+      endpoint: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090/api/v1/write
+      resource_to_telemetry_conversion:
+        enabled: true
+    otlphttp/loki:
+      endpoint: http://loki.observability.svc.cluster.local:3100/otlp
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [datadog, datadog/connector, spanmetrics]
+      metrics:
+        receivers: [otlp, spanmetrics, datadog/connector]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [prometheusremotewrite, datadog]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlphttp/loki, datadog]

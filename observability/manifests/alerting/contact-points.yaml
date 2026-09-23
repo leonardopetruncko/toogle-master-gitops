@@ -1,0 +1,43 @@
+# Contact points: para onde o alerta vai quando dispara.
+# Os valores ${...} vêm de variáveis de ambiente do Grafana (Secret "grafana-alerting",
+# criado pelo fase4-secrets.ps1), então nenhuma chave fica no Git.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: incidente-toggle-master
+    receivers:
+      # 1. Gerenciamento de incidentes: abre (e resolve) o incidente no PagerDuty.
+      - uid: cp-pagerduty
+        type: pagerduty
+        settings:
+          integrationKey: ${PAGERDUTY_ROUTING_KEY}
+          severity: critical
+          class: http-5xx
+          component: '{{ .CommonLabels.service }}'
+          group: toggle-master
+          summary: '[ToggleMaster] {{ .CommonAnnotations.summary }}'
+
+      # 2. ChatOps: mensagem detalhada no canal do Discord (firing e resolved).
+      - uid: cp-discord
+        type: discord
+        settings:
+          url: ${DISCORD_WEBHOOK_URL}
+          use_discord_username: false
+          title: '{{ if eq .Status "firing" }}🚨 INCIDENTE{{ else }}✅ RESOLVIDO{{ end }} | {{ .CommonLabels.alertname }}'
+          message: |-
+            {{ range .Alerts }}**Status:** {{ .Status | toUpper }}
+            **Serviço:** `{{ .Labels.service }}` (namespace `{{ .Labels.namespace }}`)
+            **Severidade:** {{ .Labels.severity }}
+            **Resumo:** {{ .Annotations.summary }}
+            **Detalhes:** {{ .Annotations.description }}
+            **Ação automática:** {{ .Annotations.acao_automatica }}
+            **Início:** {{ .StartsAt.Format "02/01/2006 15:04:05" }} UTC
+            **Runbook:** {{ .Annotations.runbook_url }}
+            {{ end }}
+
+      # 3. Self-healing: webhook interno que dispara o rollout restart (Runbook Automation).
+      - uid: cp-self-healer
+        type: webhook
+        settings:
+          url: http://self-healer.observability.svc.cluster.local:8080/webhook
+          httpMethod: POST

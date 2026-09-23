@@ -1,0 +1,39 @@
+# Configuração da observabilidade como código (sincronizada pelo ArgoCD).
+# Os ConfigMaps são gerados a partir de arquivos reais (código Python, YAML de alertas e
+# JSON do dashboard), assim cada um é editado e revisado como arquivo normal no Git.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - self-healer/self-healer.yaml
+
+configMapGenerator:
+  # Código do self-healer. O sufixo de hash faz o Deployment reiniciar quando o código muda.
+  - name: self-healer-code
+    namespace: observability
+    files:
+      - self-healer/self_healer.py
+
+  # Regras de alerta, contact points e policy: carregados pelo sidecar do Grafana.
+  - name: grafana-alerting-provisioning
+    namespace: observability
+    files:
+      - alerting/rules.yaml
+      - alerting/contact-points.yaml
+      - alerting/policies.yaml
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_alert: "1"
+
+  # Dashboard customizado: carregado pelo sidecar do Grafana na pasta "ToggleMaster".
+  - name: grafana-dashboard-toggle-master
+    namespace: observability
+    files:
+      - dashboards/toggle-master-saude.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: ToggleMaster

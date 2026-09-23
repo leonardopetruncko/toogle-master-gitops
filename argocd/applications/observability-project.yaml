@@ -1,0 +1,33 @@
+# AppProject da stack de observabilidade (Fase 4).
+# Separado do projeto das aplicações: a stack precisa de recursos de cluster (CRDs,
+# ClusterRoles, webhooks), enquanto o projeto toogle-master continua restrito.
+# Sync-wave -1: o ArgoCD cria o projeto antes das Applications que dependem dele.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Stack de observabilidade do ToggleMaster (Prometheus, Loki, Grafana, OTel Collector, self-healer)
+  sourceRepos:
+    - 'https://github.com/drop0rz/toogle-master-gitops.git'
+    - 'https://prometheus-community.github.io/helm-charts'
+    - 'https://grafana.github.io/helm-charts'
+    - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
+  destinations:
+    - namespace: observability
+      server: https://kubernetes.default.svc
+    # kube-prometheus-stack cria Services de coleta no kube-system (ex.: kubelet, coredns).
+    - namespace: kube-system
+      server: https://kubernetes.default.svc
+    # RBAC do self-healer (Role/RoleBinding) mora no namespace das aplicações.
+    - namespace: toogle-master
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

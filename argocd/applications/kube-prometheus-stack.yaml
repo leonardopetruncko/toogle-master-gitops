@@ -1,0 +1,38 @@
+# Prometheus (métricas) + Grafana (visualização e alertas) + kube-state-metrics + node-exporter.
+# Multi-source: o chart vem do repositório Helm oficial e o values vem deste repo Git
+# (ref "values"), então toda a configuração fica versionada aqui.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: observability
+  sources:
+    - repoURL: 'https://prometheus-community.github.io/helm-charts'
+      chart: kube-prometheus-stack
+      targetRevision: 91.4.1
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/observability/values/kube-prometheus-stack.yaml
+    - repoURL: 'https://github.com/drop0rz/toogle-master-gitops.git'
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Os CRDs do Prometheus Operator passam do limite de tamanho de annotation do apply comum.
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

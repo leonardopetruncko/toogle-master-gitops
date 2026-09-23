@@ -1,0 +1,96 @@
+# kube-prometheus-stack: Prometheus + Grafana + kube-state-metrics + node-exporter.
+# O Alertmanager fica desligado: os alertas são do Grafana Alerting (um lugar só para
+# regra, rota e contact points, versionados como código em observability/manifests/alerting).
+
+crds:
+  enabled: true
+
+# No EKS o control plane é gerenciado pela AWS: não há como coletar esses componentes.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+# O admission webhook do operator é "patcheado" por um Job depois do deploy (caBundle),
+# o que o selfHeal do ArgoCD enxerga como drift e desfaz em loop. Não é necessário aqui.
+prometheusOperator:
+  admissionWebhooks:
+    enabled: false
+  tls:
+    enabled: false
+
+prometheus:
+  prometheusSpec:
+    # Recebe as métricas que o OTel Collector envia (apps + spanmetrics).
+    enableRemoteWriteReceiver: true
+    retention: 12h
+    # Sem EBS CSI no Academy: TSDB em emptyDir (os dados vivem enquanto o cluster existir).
+    storageSpec: {}
+    # Coleta ServiceMonitors/PodMonitors de qualquer release, não só deste chart.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+
+grafana:
+  # Usuário e senha vêm de um Secret criado pelo fase4-secrets.ps1 (fora do Git).
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  # Chave do PagerDuty e webhook do Discord, usados nos contact points (também fora do Git).
+  envFromSecrets:
+    - name: grafana-alerting
+      optional: true
+
+  persistence:
+    enabled: false
+
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      access: proxy
+      url: http://loki.observability.svc.cluster.local:3100
+      jsonData:
+        maxLines: 1000
+
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+    # Regras de alerta, contact points e notification policy vêm de ConfigMaps
+    # com o label grafana_alert (observability/manifests/alerting).
+    alerts:
+      enabled: true
+      label: grafana_alert
+      labelValue: "1"
+
+  grafana.ini:
+    unified_alerting:
+      enabled: true
+    users:
+      default_theme: dark
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi

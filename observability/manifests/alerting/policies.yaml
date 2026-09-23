@@ -1,0 +1,17 @@
+# Notification policy (roteamento). Decisões contra alert fatigue:
+#  - group_by alertname+service: vários pods/eventos do mesmo problema viram UMA notificação;
+#  - group_wait 10s: espera alertas irmãos chegarem antes de notificar;
+#  - repeat_interval 1h: um incidente aberto não fica "gritando" a cada minuto;
+#  - só alertas severity=critical acordam alguém (PagerDuty + Discord + self-healer).
+apiVersion: 1
+policies:
+  - orgId: 1
+    receiver: incidente-toggle-master
+    group_by: [alertname, service]
+    group_wait: 10s
+    group_interval: 1m
+    repeat_interval: 1h
+    routes:
+      - receiver: incidente-toggle-master
+        object_matchers:
+          - ["severity", "=", "critical"]

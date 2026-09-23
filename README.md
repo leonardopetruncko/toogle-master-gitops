@@ -9,23 +9,35 @@ manual nem credenciais de push vindas do CI.
 
 ```
 toogle-master-gitops/
-├── apps/
-│   ├── base/                 # Namespace + Ingress compartilhados
-│   ├── auth-service/          # ConfigMap, Service, Deployment
+├── apps/                          # Fases 2-3: manifests dos 5 microsserviços
+│   ├── base/                      # Namespace + Ingress compartilhados
+│   ├── auth-service/              # ConfigMap, Service, Deployment (+ variáveis OTEL_*)
 │   ├── flag-service/
 │   ├── targeting-service/
-│   ├── evaluation-service/     # + HPA
-│   └── analytics-service/       # + HPA
-└── argocd/
-    ├── project/toogle-master-project.yaml   # AppProject (escopo/permissões)
-    ├── applications/                          # 1 Application por pasta em apps/
-    │   ├── base.yaml
-    │   ├── auth-service.yaml
-    │   ├── flag-service.yaml
-    │   ├── targeting-service.yaml
-    │   ├── evaluation-service.yaml
-    │   └── analytics-service.yaml
-    └── root-app.yaml                           # "App of Apps" (bootstrap)
+│   ├── evaluation-service/        # + HPA
+│   └── analytics-service/         # + HPA
+├── observability/                 # Fase 4: observabilidade e resposta a incidentes
+│   ├── values/                    # values dos Helm charts (versionados aqui)
+│   │   ├── kube-prometheus-stack.yaml   # Prometheus + Grafana
+│   │   ├── loki.yaml
+│   │   └── otel-collector.yaml          # roteamento de métricas, logs e traces
+│   └── manifests/                 # Kustomize (sincronizado pelo ArgoCD)
+│       ├── alerting/              # regra de alerta, contact points e policy (Grafana)
+│       ├── dashboards/            # dashboard "ToggleMaster - Saúde do Ecossistema"
+│       └── self-healer/           # Runbook Automation (webhook -> rollout restart)
+├── argocd/
+│   ├── project/toogle-master-project.yaml   # AppProject das aplicações
+│   ├── applications/              # 1 Application por componente (App of Apps)
+│   │   ├── base.yaml + 5 microsserviços
+│   │   ├── observability-project.yaml       # AppProject da stack de observabilidade
+│   │   ├── kube-prometheus-stack.yaml       # Helm (multi-source: chart oficial + values daqui)
+│   │   ├── loki.yaml
+│   │   ├── otel-collector.yaml
+│   │   └── observability-config.yaml        # dashboard + alertas + self-healer
+│   └── root-app.yaml              # "App of Apps" (bootstrap)
+└── docs/
+    ├── arquitetura/               # diagrama da Fase 4 (diagram as code)
+    └── runbook-auth-5xx.md        # runbook do alerta (linkado na notificação)
 ```
 
 ## Como funciona o fluxo Pull-Based
@@ -64,8 +76,8 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 argocd app list
 ```
 
-Você deve ver 6 Applications (`toogle-master-base` + 5 microsserviços), todas
-em `Synced`/`Healthy`.
+Você deve ver 11 Applications (`toogle-master-base`, 5 microsserviços e 5 da
+observabilidade), todas em `Synced`/`Healthy`.
 
 ## Por que um repositório separado?
 
@@ -73,3 +85,36 @@ Separar infraestrutura de deploy do código-fonte dos microsserviços é uma
 prática central de GitOps: o time de aplicação não precisa (nem deve ter)
 acesso de escrita no cluster, e o histórico deste repositório vira a
 "fonte da verdade" auditável de tudo que já foi implantado.
+
+## Fase 4: Observabilidade Total e Resposta Ativa
+
+![Arquitetura da Fase 4](docs/arquitetura/arquitetura-fase4.png)
+
+Toda a stack de observabilidade entra no cluster **pelo mesmo fluxo GitOps**: são
+Applications do ArgoCD apontando para os Helm charts oficiais, com os `values` versionados
+em `observability/values/`. Nada é instalado com `helm install` manual.
+
+| Peça | O que faz |
+|---|---|
+| **OTel Collector** (DaemonSet) | Recebe OTLP dos 5 serviços e lê os logs de todos os pods (`filelog`). Enriquece com metadados do K8s e roteia: traces para o Datadog, métricas para o Prometheus (remote write) e logs para o Loki. Também manda tudo para o Datadog. O connector `spanmetrics` gera métricas RED a partir dos traces. |
+| **Prometheus** | Métricas de infraestrutura (cAdvisor, kube-state-metrics, node-exporter) e das aplicações (via Collector). |
+| **Loki** | Logs centralizados e indexados por `k8s_namespace_name`, `k8s_deployment_name` e `service_name`. |
+| **Grafana** | Dashboard customizado (recursos do cluster, req/s, erro e latência por serviço, logs ao vivo) e o alerta. |
+| **Datadog** | APM: Service Map dos 5 serviços e traces distribuídos. O `datadogconnector` calcula as APM stats dentro do próprio Collector. |
+| **PagerDuty + Discord** | Incidente e ChatOps, disparados pelo Grafana Alerting. |
+| **Self-healer** | Runbook Automation: recebe o webhook do alerta e faz `rollout restart` no deployment afetado (allowlist + cooldown). |
+
+Decisões importantes:
+
+- **Alertas como código**: regra, contact points e policy ficam em `observability/manifests/alerting`
+  e são carregados pelo sidecar do Grafana. As chaves (PagerDuty, Discord, Datadog) ficam
+  em Secrets criados pelo `fase4-secrets.ps1`, nunca no Git.
+- **Alert fatigue**: o alerta usa taxa (não contagem), exige 1 minuto acima do limite, agrupa
+  por serviço e repete no máximo a cada 1h. O self-healer tem cooldown de 5 minutos.
+- **ArgoCD x self-healing**: as Applications dos serviços ignoram a annotation `restartedAt`
+  (`ignoreDifferences` + `RespectIgnoreDifferences`). Sem isso, o `selfHeal` do ArgoCD
+  desfaria o restart do self-healer. Nos serviços com HPA, o `replicas` também é ignorado.
+- **Sem volumes persistentes**: o AWS Academy não tem o driver EBS CSI, então Prometheus
+  e Loki usam `emptyDir`. Os dados vivem enquanto o cluster existir.
+
+Runbook do incidente: [docs/runbook-auth-5xx.md](docs/runbook-auth-5xx.md).

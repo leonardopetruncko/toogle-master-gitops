@@ -21,6 +21,19 @@ spec:
           ports:
             - containerPort: 8005
           env:
+            # --- OpenTelemetry (Fase 4): SDK envia traces e métricas ao OTel Collector do nó ---
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_SERVICE_NAME
+              value: "analytics-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace=toggle-master,service.version=fase4,deployment.environment=fase4,service.instance.id=$(POD_NAME)"
             - name: PORT
               valueFrom:
                 configMapKeyRef:

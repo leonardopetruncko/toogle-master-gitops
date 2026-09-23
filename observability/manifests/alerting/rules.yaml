@@ -1,0 +1,69 @@
+# Regra de alerta "inteligente" (Grafana Alerting), provisionada como código.
+# Obs.: o Grafana interpola variáveis de ambiente neste arquivo, por isso o $ dos
+# templates é escrito como $$ (ex.: $$values).
+#
+# Mede a TAXA de erro, e não a contagem: com pouco tráfego, 1 erro isolado não vira
+# incidente. Só dispara se a taxa de 5xx do auth-service passar de 5% e FICAR acima
+# disso por 1 minuto seguido (for: 1m). Isso evita alert fatigue por pico momentâneo.
+#
+# Fonte: métricas RED geradas pelo connector spanmetrics do OTel Collector a partir dos
+# spans de servidor (status ERROR = resposta 5xx, pela convenção semântica do OTel).
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: toggle-master-slo
+    folder: ToggleMaster
+    interval: 30s
+    rules:
+      - uid: auth-5xx-rate
+        title: auth-service - taxa de erros 5xx acima de 5%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                100 *
+                (sum(rate(traces_span_metrics_calls_total{service_name="auth-service", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}[1m])) or vector(0))
+                /
+                sum(rate(traces_span_metrics_calls_total{service_name="auth-service", span_kind="SPAN_KIND_SERVER"}[1m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+        # Sem tráfego não há taxa: isso não é incidente.
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+          service: auth-service
+          # Lidos pelo self-healer para saber o que reiniciar.
+          namespace: toogle-master
+          deployment: auth-service
+        annotations:
+          summary: auth-service com {{ printf "%.1f" $$values.B.Value }}% de respostas 5xx
+          description: >-
+            A taxa de erros 5xx do auth-service está em {{ printf "%.1f" $$values.B.Value }}%
+            (limite 5%) há mais de 1 minuto. Os serviços flag e targeting dependem dele
+            para validar chaves, então a avaliação de flags fica comprometida.
+          acao_automatica: self-healer executa rollout restart em deployment/auth-service (cooldown 5 min)
+          runbook_url: https://github.com/drop0rz/toogle-master-gitops/blob/main/docs/runbook-auth-5xx.md
