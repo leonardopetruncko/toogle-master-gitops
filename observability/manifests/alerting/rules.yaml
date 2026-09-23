@@ -1,6 +1,6 @@
 # Regra de alerta "inteligente" (Grafana Alerting), provisionada como código.
-# Obs.: o Grafana interpola variáveis de ambiente neste arquivo, por isso o $ dos
-# templates é escrito como $$ (ex.: $$values).
+# Obs.: neste arquivo só ${VAR} sofre interpolação de variável de ambiente, então os
+# templates do alerta usam $values normalmente.
 #
 # Mede a TAXA de erro, e não a contagem: com pouco tráfego, 1 erro isolado não vira
 # incidente. Só dispara se a taxa de 5xx do auth-service passar de 5% e FICAR acima
@@ -60,9 +60,9 @@ groups:
           namespace: toogle-master
           deployment: auth-service
         annotations:
-          summary: auth-service com {{ printf "%.1f" $$values.B.Value }}% de respostas 5xx
+          summary: auth-service com {{ printf "%.1f" $values.B.Value }}% de respostas 5xx
           description: >-
-            A taxa de erros 5xx do auth-service está em {{ printf "%.1f" $$values.B.Value }}%
+            A taxa de erros 5xx do auth-service está em {{ printf "%.1f" $values.B.Value }}%
             (limite 5%) há mais de 1 minuto. Os serviços flag e targeting dependem dele
             para validar chaves, então a avaliação de flags fica comprometida.
           acao_automatica: self-healer executa rollout restart em deployment/auth-service (cooldown 5 min)
