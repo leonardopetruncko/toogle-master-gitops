@@ -6,7 +6,7 @@ metadata:
 spec:
   description: Projeto ArgoCD para os 5 microsserviços do ToggleMaster
   sourceRepos:
-    - 'https://github.com/drop0rz/toogle-master-gitops.git'
+    - 'https://github.com/leonardopetruncko/toogle-master-gitops.git'
   destinations:
     - namespace: toogle-master
       server: https://kubernetes.default.svc

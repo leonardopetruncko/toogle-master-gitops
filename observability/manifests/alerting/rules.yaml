@@ -66,4 +66,4 @@ groups:
             (limite 5%) há mais de 1 minuto. Os serviços flag e targeting dependem dele
             para validar chaves, então a avaliação de flags fica comprometida.
           acao_automatica: self-healer executa rollout restart em deployment/auth-service (cooldown 5 min)
-          runbook_url: https://github.com/drop0rz/toogle-master-gitops/blob/main/docs/runbook-auth-5xx.md
+          runbook_url: https://github.com/leonardopetruncko/toogle-master-gitops/blob/main/docs/runbook-auth-5xx.md

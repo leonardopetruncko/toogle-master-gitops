@@ -16,7 +16,7 @@ spec:
         releaseName: otel-collector
         valueFiles:
           - $values/observability/values/otel-collector.yaml
-    - repoURL: 'https://github.com/drop0rz/toogle-master-gitops.git'
+    - repoURL: 'https://github.com/leonardopetruncko/toogle-master-gitops.git'
       targetRevision: main
       ref: values
   destination:

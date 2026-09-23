@@ -16,7 +16,7 @@ spec:
         releaseName: loki
         valueFiles:
           - $values/observability/values/loki.yaml
-    - repoURL: 'https://github.com/drop0rz/toogle-master-gitops.git'
+    - repoURL: 'https://github.com/leonardopetruncko/toogle-master-gitops.git'
       targetRevision: main
       ref: values
   destination:
