@@ -46,6 +46,19 @@ config:
       send_batch_size: 1000
       send_batch_max_size: 1000
       timeout: 5s
+    # Correlação log <-> trace no Datadog.
+    # Os logs vêm do stdout dos pods (filelog), então o trace_id está no TEXTO da linha
+    # (as apps logam "[trace_id=... span_id=...]"). Aqui ele é promovido para os campos
+    # trace_id/span_id do registro, que é o que o Datadog usa para ligar log e trace
+    # (o exporter converte para o formato dd.trace_id automaticamente).
+    transform/correlacao_log_trace:
+      error_mode: ignore
+      log_statements:
+        - context: log
+          statements:
+            - set(trace_id.string, ExtractPatterns(body, "trace_id=(?P<t>[0-9a-f]{32})")["t"]) where IsMatch(body, "trace_id=[0-9a-f]{32}")
+            - set(span_id.string, ExtractPatterns(body, "span_id=(?P<s>[0-9a-f]{16})")["s"]) where IsMatch(body, "span_id=[0-9a-f]{16}")
+
     resource/cluster:
       attributes:
         - key: k8s.cluster.name
@@ -101,5 +114,5 @@ config:
         exporters: [prometheusremotewrite, datadog]
       logs:
         receivers: [otlp]
-        processors: [memory_limiter, resource/cluster, batch]
+        processors: [memory_limiter, transform/correlacao_log_trace, resource/cluster, batch]
         exporters: [otlphttp/loki, datadog]
