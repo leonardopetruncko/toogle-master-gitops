@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: flag-service
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: flag-service
-          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/flag-service:v1.0.0-c4426ae
+          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/flag-service:v1.0.0-23d8d72
           ports:
             - containerPort: 8002
           env:
