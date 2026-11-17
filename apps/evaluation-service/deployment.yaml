@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: evaluation-service
@@ -17,11 +17,11 @@ spec:
     spec:
       containers:
         - name: evaluation-service
-          image: 431204285928.dkr.ecr.us-east-1.amazonaws.com/evaluation-service:v1.0.0-2daff31
+          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/evaluation-service:v1.0.0-2daff31
           ports:
             - containerPort: 8004
           env:
-            # --- OpenTelemetry (Fase 4): SDK envia traces e métricas ao OTel Collector do nó ---
+            # --- OpenTelemetry (Fase 4): SDK envia traces e mÃ©tricas ao OTel Collector do nÃ³ ---
             - name: POD_NAME
               valueFrom:
                 fieldRef:

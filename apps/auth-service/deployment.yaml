@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: auth-service
@@ -17,13 +17,13 @@ spec:
     spec:
       containers:
         - name: auth-service
-          # A tag abaixo é atualizada automaticamente pelo pipeline de CI
-          # (workflow "update-gitops" do repositório reusable-workflows).
-          image: 431204285928.dkr.ecr.us-east-1.amazonaws.com/auth-service:v1.0.0-29a88b6
+          # A tag abaixo Ã© atualizada automaticamente pelo pipeline de CI
+          # (workflow "update-gitops" do repositÃ³rio reusable-workflows).
+          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/auth-service:v1.0.0-29a88b6
           ports:
             - containerPort: 8001
           env:
-            # --- OpenTelemetry (Fase 4): SDK envia traces e métricas ao OTel Collector do nó ---
+            # --- OpenTelemetry (Fase 4): SDK envia traces e mÃ©tricas ao OTel Collector do nÃ³ ---
             - name: POD_NAME
               valueFrom:
                 fieldRef:
