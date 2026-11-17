@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: analytics-service
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: analytics-service
-          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/analytics-service:v1.0.0-da6789c
+          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/analytics-service:v1.0.0-1c1ce8f
           ports:
             - containerPort: 8005
           env:
