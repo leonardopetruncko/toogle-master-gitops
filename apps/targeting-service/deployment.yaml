@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: targeting-service
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: targeting-service
-          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/targeting-service:v1.0.0-3e0e1b3
+          image: 058264068417.dkr.ecr.us-east-1.amazonaws.com/targeting-service:v1.0.0-e7d3701
           ports:
             - containerPort: 8003
           env:
